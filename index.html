@@ -1090,11 +1090,35 @@
 <style>
 @media (max-width: 768px) {
     #contact-grid { grid-template-columns: 1fr !important; gap: 40px !important; }
-    .tl-step { grid-template-columns: 48px 1fr !important; gap: 20px !important; }
+    .tl-step { grid-template-columns: 48px 1fr !important; gap: 20px !important; margin-bottom: 48px !important; }
     .tl-empty { display: none !important; }
     .tl-content-left { text-align: left !important; }
     .tl-content-left p { margin-left: 0 !important; }
     #tl-track { left: 23px; transform: none; }
+
+    /* Hero orb: scale down to avoid oversized GPU layer */
+    .hero-orb { width: 280px !important; height: 280px !important; right: -40px !important; }
+
+    /* Hero content spacing */
+    #hero .mx-c { padding-top: 80px !important; padding-bottom: 80px !important; }
+}
+
+/* Form naam + email: 2-col → 1-col on small screens */
+@media (max-width: 600px) {
+    #form-fields > div { grid-template-columns: 1fr !important; }
+}
+
+/* Touch-friendly button tap targets */
+@media (hover: none) {
+    .btn-primary, .btn-secondary {
+        min-height: 48px;
+        padding-top: 14px;
+        padding-bottom: 14px;
+        -webkit-tap-highlight-color: transparent;
+    }
+    /* Disable hover states that linger on touch */
+    .bento-card:hover { transform: none !important; box-shadow: none !important; }
+    .bento-card:hover::before { opacity: 0 !important; }
 }
 </style>
 
@@ -1189,19 +1213,22 @@ gsap.to('#tl-fill', {
 });
 
 // ===== TIMELINE STEPS =====
+const isMobile = window.matchMedia('(max-width: 767px)').matches;
 ['#tl1','#tl2','#tl3','#tl4'].forEach((id, i) => {
     const el = document.querySelector(id);
     if (!el) return;
     const isLeft = i % 2 === 0;
+    const xFrom = isMobile ? 0 : (isLeft ? -50 : 50);
+    const yFrom = isMobile ? 24 : 0;
     gsap.fromTo(el,
-        { opacity: 0, x: isLeft ? -50 : 50 },
+        { opacity: 0, x: xFrom, y: yFrom },
         {
-            opacity: 1, x: 0,
+            opacity: 1, x: 0, y: 0,
             duration: 0.75,
             ease: 'power3.out',
             scrollTrigger: {
                 trigger: el,
-                start: 'top 78%',
+                start: 'top 82%',
                 toggleActions: 'play none none none'
             },
             onComplete: () => el.classList.add('vis')
@@ -1237,23 +1264,26 @@ document.querySelectorAll('.bento-card').forEach(card => {
 });
 
 // =========================================
-// MAGNETIC BUTTONS
+// MAGNETIC BUTTONS (pointer devices only)
 // =========================================
-document.querySelectorAll('.mag-wrap').forEach(wrap => {
-    const btn = wrap.querySelector('a, button');
-    if (!btn) return;
-    wrap.addEventListener('mousemove', e => {
-        const r = wrap.getBoundingClientRect();
-        const x = (e.clientX - r.left - r.width  / 2) * 0.28;
-        const y = (e.clientY - r.top  - r.height / 2) * 0.28;
-        gsap.to(btn, { x, y, duration: 0.4, ease: 'power2.out' });
+const isTouch = window.matchMedia('(hover: none)').matches;
+if (!isTouch) {
+    document.querySelectorAll('.mag-wrap').forEach(wrap => {
+        const btn = wrap.querySelector('a, button');
+        if (!btn) return;
+        wrap.addEventListener('mousemove', e => {
+            const r = wrap.getBoundingClientRect();
+            const x = (e.clientX - r.left - r.width  / 2) * 0.28;
+            const y = (e.clientY - r.top  - r.height / 2) * 0.28;
+            gsap.to(btn, { x, y, duration: 0.4, ease: 'power2.out' });
+        });
+        wrap.addEventListener('mouseleave', () => {
+            gsap.to(btn, { x: 0, y: 0, duration: 0.7, ease: 'elastic.out(1, 0.45)' });
+        });
+        btn.addEventListener('mousedown', () => gsap.to(btn, { scale: 0.96, duration: 0.1 }));
+        btn.addEventListener('mouseup',   () => gsap.to(btn, { scale: 1.0,  duration: 0.2, ease: 'elastic.out(1,0.5)' }));
     });
-    wrap.addEventListener('mouseleave', () => {
-        gsap.to(btn, { x: 0, y: 0, duration: 0.7, ease: 'elastic.out(1, 0.45)' });
-    });
-    btn.addEventListener('mousedown', () => gsap.to(btn, { scale: 0.96, duration: 0.1 }));
-    btn.addEventListener('mouseup',   () => gsap.to(btn, { scale: 1.0,  duration: 0.2, ease: 'elastic.out(1,0.5)' }));
-});
+}
 
 // =========================================
 // GENERAL FADE-INS (IntersectionObserver)
@@ -1271,13 +1301,16 @@ const heroVid  = document.getElementById('hero-video');
 const heroEl   = document.getElementById('hero');
 let rafPend    = false;
 
+const noParallax = window.matchMedia('(max-width: 768px)').matches ||
+                   window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
 function onScroll() {
     if (rafPend) return;
     rafPend = true;
     requestAnimationFrame(() => {
         const y = window.scrollY;
         navbar.classList.toggle('scrolled', y > 40);
-        if (heroVid && y < heroEl.offsetHeight) {
+        if (heroVid && !noParallax && y < heroEl.offsetHeight) {
             heroVid.style.transform = `translateY(${y * 0.28}px)`;
         }
         rafPend = false;
